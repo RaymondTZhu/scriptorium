@@ -1,0 +1,40 @@
+{
+"template_id": "template_v1",
+"template_version": "0.1.0",
+"project_name": "scriptorium",
+"description": "Initial structured handwriting capture template for consent-based glyph extraction.",
+"page": {
+"width_px": 1700,
+"height_px": 2200,
+"dpi": 200,
+"paper_size": "letter",
+"orientation": "portrait"
+},
+"character_sets": {
+"lowercase": "abcdefghijklmnopqrstuvwxyz",
+"uppercase": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+"digits": "0123456789",
+"punctuation": ".,!?;:'\"-()"
+},
+"variants_per_character": 3,
+"layout": {
+"columns": 6,
+"cell_width_px": 240,
+"cell_height_px": 120,
+"cell_gap_x_px": 20,
+"cell_gap_y_px": 28,
+"margin_left_px": 100,
+"margin_top_px": 260,
+"label_height_px": 28
+},
+"provenance_notice": {
+"title": "Consent-Based Handwriting Capture",
+"body": "Use only your own handwriting or handwriting from someone who has explicitly consented. Generated outputs should include provenance."
+},
+"notes": [
+"V1 uses a structured grid to make glyph extraction tractable.",
+"Each character should be written inside its assigned cell.",
+"Multiple variants per character allow the renderer to avoid repeating the exact same glyph every time.",
+"This metadata file is intended to support both template generation and future grid-based glyph extraction."
+]
+}
