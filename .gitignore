@@ -1,33 +1,28 @@
-# Python bytecode and caches
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
+*.egg-info/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.coverage
-htmlcov/
 
-# Virtual environments and packaging output
+# Virtual environments
 .venv/
 venv/
 env/
-build/
-dist/
-*.egg-info/
 
-# Local configuration and secrets
+# Environment variables
 .env
-.env.*
-!.env.example
 
-# Editors and operating systems
-.idea/
-.vscode/
+# OS/editor
 .DS_Store
-Thumbs.db
+.vscode/
+.idea/
 
-# Generated project data
+# Jupyter
+.ipynb_checkpoints/
+
+# Local/generated data
 data/raw/*
 data/processed/*
 data/glyphs/*
@@ -35,10 +30,19 @@ data/outputs/*
 data/manifests/*
 experiments/results/*
 
-# Retain the documented directory layout
+# Keep empty data/result directories in Git
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/glyphs/.gitkeep
 !data/outputs/.gitkeep
 !data/manifests/.gitkeep
 !experiments/results/.gitkeep
+
+# Logs
+*.log
+
+# Frontend/node, later
+node_modules/
+.next/
+dist/
+build/

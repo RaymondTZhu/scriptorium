@@ -1,0 +1,28 @@
+-  Git is installed 
+-  Python 3.11 or newer is installed 
+-  repository is cloned locally 
+-  virtual environment is created 
+-  virtual environment is activated 
+-  dependencies are installed with pip install -e ".[dev]" 
+- packages/common exists 
+- packages/cv exists 
+- packages/renderer exists 
+- packages/watermark exists 
+- packages/eval exists 
+- services/api exists 
+- apps/web exists 
+- docs exists 
+- templates exists 
+- experiments exists 
+-  local data folders exist 
+- .gitignore ignores generated data 
+- .gitignore ignores local virtual environments 
+- .gitignore ignores environment files 
+- .gitkeep files preserve empty data folders 
+-  no personal handwriting samples are committed 
+-  no generated outputs are committed unless intentionally treated as static project assets 
+-  README states legitimate project uses 
+-  README states non-goals 
+-  ethics policy exists 
+-  provenance is planned as a default requirement 
+-  non-consented handwriting use is outside the supported workflow
