@@ -11,10 +11,7 @@
 "orientation": "portrait"
 },
 "character_sets": {
-"lowercase": "abcdefghijklmnopqrstuvwxyz",
-"uppercase": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-"digits": "0123456789",
-"punctuation": ".,!?;:'\"-()"
+"lowercase": "abcdefghijklmnopqrstuvwxyz"
 },
 "variants_per_character": 3,
 "layout": {
@@ -32,9 +29,7 @@
 "body": "Use only your own handwriting or handwriting from someone who has explicitly consented. Generated outputs should include provenance."
 },
 "notes": [
-"V1 uses a structured grid to make glyph extraction tractable.",
-"Each character should be written inside its assigned cell.",
-"Multiple variants per character allow the renderer to avoid repeating the exact same glyph every time.",
-"This metadata file is intended to support both template generation and future grid-based glyph extraction."
+"V1 starts with lowercase letters only so the template fits on one page.",
+"Uppercase letters, digits, and punctuation are planned extensions."
 ]
 }
