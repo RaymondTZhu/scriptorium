@@ -41,6 +41,9 @@ experiments/results/*
 # Logs
 *.log
 
+# Local test scratch space
+.tmp_tests/
+
 # Frontend/node, later
 node_modules/
 .next/
