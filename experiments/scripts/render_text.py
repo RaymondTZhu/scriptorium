@@ -15,6 +15,8 @@ from packages.common.paths import OUTPUT_DATA_DIR, ensure_project_dirs
 from packages.renderer.glyph_library import load_glyph_library
 from packages.renderer.layout import RenderSettings
 from packages.renderer.render_png import render_text_to_image
+from packages.watermark.metadata import create_run_id, write_generation_manifest
+from packages.watermark.visible import add_visible_provenance_footer
 
 
 def parse_args() -> argparse.Namespace:
@@ -44,10 +46,22 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--user-id",
+        default="user_001",
+        help="Identifier for the handwriting sample owner.",
+    )
+
+    parser.add_argument(
         "--seed",
         type=int,
         default=7,
         help="Random seed for reproducible glyph variant sampling.",
+    )
+
+    parser.add_argument(
+        "--disable-visible-provenance",
+        action="store_true",
+        help="Disable visible footer labeling. JSON manifest is still written.",
     )
 
     return parser.parse_args()
@@ -60,6 +74,7 @@ def main() -> None:
 
     library = load_glyph_library(args.manifest)
     settings = RenderSettings()
+    run_id = create_run_id()
 
     output_path = render_text_to_image(
         text=args.text,
@@ -69,7 +84,22 @@ def main() -> None:
         seed=args.seed,
     )
 
+    if not args.disable_visible_provenance:
+        output_path = add_visible_provenance_footer(output_path)
+
+    manifest_path = write_generation_manifest(
+        user_id=args.user_id,
+        input_text=args.text,
+        output_image_path=output_path,
+        run_id=run_id,
+        extra_fields={
+            "glyph_manifest_path": str(args.manifest),
+            "visible_provenance_enabled": not args.disable_visible_provenance,
+        },
+    )
+
     print(f"Saved rendered text image: {output_path}")
+    print(f"Saved provenance manifest: {manifest_path}")
 
 
 if __name__ == "__main__":
