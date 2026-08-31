@@ -21,7 +21,7 @@ from packages.common.paths import (
 )
 from packages.cv.glyph_extract import extract_glyphs_from_template
 from packages.cv.preprocess import preprocess_image
-from packages.eval.visual_report import create_glyph_contact_sheet
+from packages.eval.visual_report import create_glyph_contact_sheet, create_visual_report
 from packages.renderer.glyph_library import load_glyph_library
 from packages.renderer.layout import RendererVariationConfig, RenderSettings
 from packages.renderer.render_png import render_text_to_image
@@ -96,6 +96,12 @@ def parse_args() -> argparse.Namespace:
         help="Maximum line-spacing jitter in pixels.",
     )
 
+    parser.add_argument(
+        "--skip-visual-report",
+        action="store_true",
+        help="Skip automatic visual evaluation report generation.",
+    )
+
     return parser.parse_args()
 
 
@@ -118,6 +124,7 @@ def main() -> None:
     glyph_output_dir = GLYPH_DATA_DIR / args.user_id
     contact_sheet_path = glyph_output_dir / "glyph_contact_sheet.png"
     rendered_output_path = OUTPUT_DATA_DIR / f"{run_id}_rendered_text.png"
+    visual_report_path = OUTPUT_DATA_DIR / "visual_report.png"
 
     preprocess_image(
         input_path=args.input,
@@ -163,11 +170,31 @@ def main() -> None:
         },
     )
 
+    report_created = False
+    required_report_artifacts = (
+        args.input,
+        contact_sheet_path,
+        output_path,
+        provenance_manifest_path,
+    )
+
+    if not args.skip_visual_report and all(path.exists() for path in required_report_artifacts):
+        create_visual_report(
+            template_image_path=args.input,
+            contact_sheet_path=contact_sheet_path,
+            rendered_output_path=output_path,
+            generation_record_path=provenance_manifest_path,
+            output_path=visual_report_path,
+        )
+        report_created = True
+
     print(f"Saved processed image: {processed_path}")
     print(f"Saved glyph manifest: {glyph_manifest_path}")
     print(f"Saved contact sheet: {contact_sheet_path}")
     print(f"Saved rendered output: {output_path}")
     print(f"Saved provenance manifest: {provenance_manifest_path}")
+    if report_created:
+        print(f"Saved visual evaluation report: {visual_report_path}")
 
 
 if __name__ == "__main__":
