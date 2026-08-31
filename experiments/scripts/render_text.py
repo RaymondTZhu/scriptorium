@@ -9,11 +9,12 @@ Example:
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict
 from pathlib import Path
 
 from packages.common.paths import OUTPUT_DATA_DIR, ensure_project_dirs
 from packages.renderer.glyph_library import load_glyph_library
-from packages.renderer.layout import RenderSettings
+from packages.renderer.layout import RendererVariationConfig, RenderSettings
 from packages.renderer.render_png import render_text_to_image
 from packages.watermark.metadata import create_run_id, write_generation_manifest
 from packages.watermark.visible import add_visible_provenance_footer
@@ -55,7 +56,42 @@ def parse_args() -> argparse.Namespace:
         "--seed",
         type=int,
         default=7,
-        help="Random seed for reproducible glyph variant sampling.",
+        help="Random seed for reproducible glyph selection and variation.",
+    )
+
+    parser.add_argument(
+        "--x-jitter-px",
+        type=int,
+        default=2,
+        help="Maximum horizontal glyph-position jitter in pixels.",
+    )
+
+    parser.add_argument(
+        "--y-jitter-px",
+        type=int,
+        default=3,
+        help="Maximum baseline jitter in pixels.",
+    )
+
+    parser.add_argument(
+        "--scale-jitter",
+        type=float,
+        default=0.04,
+        help="Maximum proportional glyph-scale jitter.",
+    )
+
+    parser.add_argument(
+        "--spacing-jitter-px",
+        type=int,
+        default=2,
+        help="Maximum inter-glyph spacing jitter in pixels.",
+    )
+
+    parser.add_argument(
+        "--line-spacing-jitter-px",
+        type=int,
+        default=0,
+        help="Maximum line-spacing jitter in pixels.",
     )
 
     parser.add_argument(
@@ -74,6 +110,14 @@ def main() -> None:
 
     library = load_glyph_library(args.manifest)
     settings = RenderSettings()
+    variation = RendererVariationConfig(
+        seed=args.seed,
+        x_jitter_px=max(0, args.x_jitter_px),
+        y_jitter_px=max(0, args.y_jitter_px),
+        scale_jitter=max(0.0, args.scale_jitter),
+        spacing_jitter_px=max(0, args.spacing_jitter_px),
+        line_spacing_jitter_px=max(0, args.line_spacing_jitter_px),
+    )
     run_id = create_run_id()
 
     output_path = render_text_to_image(
@@ -81,7 +125,7 @@ def main() -> None:
         library=library,
         output_path=args.output,
         settings=settings,
-        seed=args.seed,
+        variation=variation,
     )
 
     if not args.disable_visible_provenance:
@@ -95,6 +139,7 @@ def main() -> None:
         extra_fields={
             "glyph_manifest_path": str(args.manifest),
             "visible_provenance_enabled": not args.disable_visible_provenance,
+            "renderer_config": asdict(variation),
         },
     )
 

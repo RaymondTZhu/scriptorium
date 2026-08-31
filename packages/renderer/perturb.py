@@ -15,3 +15,12 @@ def jitter_int(base_value: int, max_abs_jitter: int, rng: random.Random) -> int:
         return base_value
 
     return base_value + rng.randint(-max_abs_jitter, max_abs_jitter)
+
+
+def jitter_scale(max_abs_jitter: float, rng: random.Random) -> float:
+    """Return a positive scale factor with bounded random jitter."""
+    if max_abs_jitter <= 0:
+        return 1.0
+
+    bounded_jitter = min(max_abs_jitter, 0.95)
+    return 1.0 + rng.uniform(-bounded_jitter, bounded_jitter)

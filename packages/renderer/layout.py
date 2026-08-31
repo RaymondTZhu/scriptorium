@@ -6,6 +6,18 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+class RendererVariationConfig:
+    """Conservative variation controls for procedural glyph rendering."""
+
+    seed: int | None = None
+    x_jitter_px: int = 2
+    y_jitter_px: int = 3
+    scale_jitter: float = 0.04
+    spacing_jitter_px: int = 2
+    line_spacing_jitter_px: int = 0
+
+
+@dataclass(frozen=True)
 class RenderSettings:
     """Basic rendering settings for V1 handwritten-style output."""
 
@@ -17,5 +29,4 @@ class RenderSettings:
     glyph_height: int = 70
     character_spacing: int = 8
     word_spacing: int = 38
-    baseline_jitter_px: int = 3
     placeholder_width: int = 36

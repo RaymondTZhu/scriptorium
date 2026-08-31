@@ -10,6 +10,7 @@ Example:
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict
 from pathlib import Path
 
 from packages.common.paths import (
@@ -22,7 +23,7 @@ from packages.cv.glyph_extract import extract_glyphs_from_template
 from packages.cv.preprocess import preprocess_image
 from packages.eval.visual_report import create_glyph_contact_sheet
 from packages.renderer.glyph_library import load_glyph_library
-from packages.renderer.layout import RenderSettings
+from packages.renderer.layout import RendererVariationConfig, RenderSettings
 from packages.renderer.render_png import render_text_to_image
 from packages.watermark.metadata import create_run_id, write_generation_manifest
 from packages.watermark.visible import add_visible_provenance_footer
@@ -60,6 +61,41 @@ def parse_args() -> argparse.Namespace:
         help="Random seed for reproducible rendering.",
     )
 
+    parser.add_argument(
+        "--x-jitter-px",
+        type=int,
+        default=2,
+        help="Maximum horizontal glyph-position jitter in pixels.",
+    )
+
+    parser.add_argument(
+        "--y-jitter-px",
+        type=int,
+        default=3,
+        help="Maximum baseline jitter in pixels.",
+    )
+
+    parser.add_argument(
+        "--scale-jitter",
+        type=float,
+        default=0.04,
+        help="Maximum proportional glyph-scale jitter.",
+    )
+
+    parser.add_argument(
+        "--spacing-jitter-px",
+        type=int,
+        default=2,
+        help="Maximum inter-glyph spacing jitter in pixels.",
+    )
+
+    parser.add_argument(
+        "--line-spacing-jitter-px",
+        type=int,
+        default=0,
+        help="Maximum line-spacing jitter in pixels.",
+    )
+
     return parser.parse_args()
 
 
@@ -69,6 +105,14 @@ def main() -> None:
     ensure_project_dirs()
 
     run_id = create_run_id()
+    variation = RendererVariationConfig(
+        seed=args.seed,
+        x_jitter_px=max(0, args.x_jitter_px),
+        y_jitter_px=max(0, args.y_jitter_px),
+        scale_jitter=max(0.0, args.scale_jitter),
+        spacing_jitter_px=max(0, args.spacing_jitter_px),
+        line_spacing_jitter_px=max(0, args.line_spacing_jitter_px),
+    )
 
     processed_path = PROCESSED_DATA_DIR / f"{run_id}_binary.png"
     glyph_output_dir = GLYPH_DATA_DIR / args.user_id
@@ -98,7 +142,7 @@ def main() -> None:
         library=library,
         output_path=rendered_output_path,
         settings=RenderSettings(),
-        seed=args.seed,
+        variation=variation,
     )
 
     output_path = add_visible_provenance_footer(output_path)
@@ -115,6 +159,7 @@ def main() -> None:
             "glyph_manifest_path": str(glyph_manifest_path),
             "contact_sheet_path": str(contact_sheet_path),
             "visible_provenance_enabled": True,
+            "renderer_config": asdict(variation),
         },
     )
 
