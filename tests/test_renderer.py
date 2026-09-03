@@ -1,12 +1,11 @@
 """Smoke tests for deterministic renderer variation controls."""
 
 import shutil
-from pathlib import Path
 
 from PIL import Image, ImageDraw
 
 from packages.common.paths import PROJECT_ROOT
-from packages.common.types import GlyphRecord
+from packages.common.types import BoundingBox, GlyphRecord
 from packages.renderer.glyph_library import GlyphLibrary
 from packages.renderer.layout import RendererVariationConfig, RenderSettings
 from packages.renderer.render_png import render_text_to_image
@@ -84,5 +83,60 @@ def test_renderer_changes_for_different_seeds() -> None:
         second = render_with_seed(library, seed=23, filename="second.png")
 
         assert first != second
+    finally:
+        shutil.rmtree(PROJECT_ROOT / ".tmp_tests", ignore_errors=True)
+
+
+def test_trimmed_width_controls_character_spacing() -> None:
+    """A large original cell must not inflate spacing for a narrow glyph asset."""
+    if TEST_SCRATCH_DIR.exists():
+        shutil.rmtree(TEST_SCRATCH_DIR)
+
+    TEST_SCRATCH_DIR.mkdir(parents=True, exist_ok=True)
+    image_path = TEST_SCRATCH_DIR / "narrow.png"
+    Image.new("L", (8, 20), "black").save(image_path)
+    library = GlyphLibrary(
+        [
+            GlyphRecord(
+                user_id="test_user",
+                character="a",
+                variant_id=1,
+                image_path=image_path,
+                original_bbox=BoundingBox(x=0, y=0, width=240, height=92),
+                width=8,
+                height=20,
+                has_ink=True,
+            )
+        ]
+    )
+    output_path = TEST_SCRATCH_DIR / "narrow_render.png"
+
+    try:
+        render_text_to_image(
+            text="aa",
+            library=library,
+            output_path=output_path,
+            settings=RenderSettings(
+                canvas_width=200,
+                canvas_height=80,
+                margin_left=10,
+                margin_top=10,
+                glyph_height=20,
+                character_spacing=4,
+            ),
+            variation=RendererVariationConfig(
+                seed=1,
+                x_jitter_px=0,
+                y_jitter_px=0,
+                scale_jitter=0,
+                spacing_jitter_px=0,
+            ),
+        )
+
+        with Image.open(output_path) as rendered:
+            ink_bounds = rendered.convert("L").point(lambda value: 255 - value).getbbox()
+
+        assert ink_bounds is not None
+        assert ink_bounds[2] <= 30
     finally:
         shutil.rmtree(PROJECT_ROOT / ".tmp_tests", ignore_errors=True)

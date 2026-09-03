@@ -10,6 +10,7 @@ Example:
 from __future__ import annotations
 
 import argparse
+import shutil
 from dataclasses import asdict
 from pathlib import Path
 
@@ -124,6 +125,7 @@ def main() -> None:
     glyph_output_dir = GLYPH_DATA_DIR / args.user_id
     contact_sheet_path = glyph_output_dir / "glyph_contact_sheet.png"
     rendered_output_path = OUTPUT_DATA_DIR / f"{run_id}_rendered_text.png"
+    latest_rendered_output_path = OUTPUT_DATA_DIR / "rendered_text.png"
     visual_report_path = OUTPUT_DATA_DIR / "visual_report.png"
 
     preprocess_image(
@@ -153,6 +155,7 @@ def main() -> None:
     )
 
     output_path = add_visible_provenance_footer(output_path)
+    shutil.copy2(output_path, latest_rendered_output_path)
 
     provenance_manifest_path = write_generation_manifest(
         user_id=args.user_id,
@@ -174,7 +177,7 @@ def main() -> None:
     required_report_artifacts = (
         args.input,
         contact_sheet_path,
-        output_path,
+        latest_rendered_output_path,
         provenance_manifest_path,
     )
 
@@ -182,7 +185,7 @@ def main() -> None:
         create_visual_report(
             template_image_path=args.input,
             contact_sheet_path=contact_sheet_path,
-            rendered_output_path=output_path,
+            rendered_output_path=latest_rendered_output_path,
             generation_record_path=provenance_manifest_path,
             output_path=visual_report_path,
         )
@@ -192,6 +195,7 @@ def main() -> None:
     print(f"Saved glyph manifest: {glyph_manifest_path}")
     print(f"Saved contact sheet: {contact_sheet_path}")
     print(f"Saved rendered output: {output_path}")
+    print(f"Saved latest rendered output: {latest_rendered_output_path}")
     print(f"Saved provenance manifest: {provenance_manifest_path}")
     if report_created:
         print(f"Saved visual evaluation report: {visual_report_path}")

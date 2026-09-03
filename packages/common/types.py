@@ -35,6 +35,11 @@ class GlyphRecord:
     image_path: Path
     bbox: BoundingBox | None = None
     quality_score: float | None = None
+    original_bbox: BoundingBox | None = None
+    ink_bbox: BoundingBox | None = None
+    width: int | None = None
+    height: int | None = None
+    has_ink: bool = True
 
 
 @dataclass(frozen=True)

@@ -8,7 +8,7 @@ from pathlib import Path
 import cv2
 
 from packages.common.paths import GLYPH_DATA_DIR
-from packages.cv.quality import score_crop_quality
+from packages.cv.quality import score_crop_quality, trim_to_ink_bounding_box
 from packages.cv.segment import (
     crop_bbox,
     crop_handwriting_region,
@@ -57,12 +57,14 @@ def extract_glyphs_from_template(
 
         full_cell_crop = crop_bbox(image, bbox)
         handwriting_crop = crop_handwriting_region(full_cell_crop, label_height)
+        trimmed_crop, ink_bbox = trim_to_ink_bounding_box(handwriting_crop)
+        quality = score_crop_quality(handwriting_crop)
 
         safe_character = make_safe_character_name(character)
         crop_filename = f"{safe_character}_variant_{variant_id}.png"
         crop_path = user_output_dir / crop_filename
 
-        save_crop(handwriting_crop, crop_path)
+        save_crop(trimmed_crop, crop_path)
 
         records.append(
             {
@@ -71,7 +73,12 @@ def extract_glyphs_from_template(
                 "variant_id": variant_id,
                 "image_path": str(crop_path),
                 "cell_bbox": serialize_bbox(bbox),
-                "quality": score_crop_quality(handwriting_crop),
+                "original_bbox": serialize_bbox(bbox),
+                "ink_bbox": serialize_bbox(ink_bbox) if ink_bbox is not None else None,
+                "width": int(trimmed_crop.shape[1]),
+                "height": int(trimmed_crop.shape[0]),
+                "has_ink": quality["has_ink"],
+                "quality": quality,
             }
         )
 

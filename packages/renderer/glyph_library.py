@@ -24,7 +24,8 @@ class GlyphLibrary:
         self._by_character: dict[str, list[GlyphRecord]] = defaultdict(list)
 
         for glyph in glyphs:
-            self._by_character[glyph.character].append(glyph)
+            if glyph.has_ink:
+                self._by_character[glyph.character].append(glyph)
 
     def characters(self) -> list[str]:
         """Return all characters available in this glyph library."""
@@ -62,15 +63,8 @@ def load_glyph_library(manifest_path: Path) -> GlyphLibrary:
 
     for record in manifest["glyphs"]:
         bbox_data = record.get("cell_bbox")
-        bbox = None
-
-        if bbox_data is not None:
-            bbox = BoundingBox(
-                x=bbox_data["x"],
-                y=bbox_data["y"],
-                width=bbox_data["width"],
-                height=bbox_data["height"],
-            )
+        original_bbox_data = record.get("original_bbox", bbox_data)
+        quality = record.get("quality", {})
 
         glyphs.append(
             GlyphRecord(
@@ -78,9 +72,27 @@ def load_glyph_library(manifest_path: Path) -> GlyphLibrary:
                 character=record["character"],
                 variant_id=record["variant_id"],
                 image_path=Path(record["image_path"]),
-                bbox=bbox,
-                quality_score=record.get("quality", {}).get("dark_pixel_ratio"),
+                bbox=_deserialize_bbox(bbox_data),
+                quality_score=quality.get("dark_pixel_ratio"),
+                original_bbox=_deserialize_bbox(original_bbox_data),
+                ink_bbox=_deserialize_bbox(record.get("ink_bbox")),
+                width=record.get("width"),
+                height=record.get("height"),
+                has_ink=record.get("has_ink", not quality.get("probably_empty", False)),
             )
         )
 
     return GlyphLibrary(glyphs)
+
+
+def _deserialize_bbox(data: dict | None) -> BoundingBox | None:
+    """Create a bounding box from manifest data when present."""
+    if data is None:
+        return None
+
+    return BoundingBox(
+        x=data["x"],
+        y=data["y"],
+        width=data["width"],
+        height=data["height"],
+    )
