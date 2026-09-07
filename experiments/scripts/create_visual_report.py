@@ -1,4 +1,4 @@
-"""Create a visual evaluation report from V1 pipeline artifacts."""
+"""Create a visual evaluation report from pipeline artifacts."""
 
 from __future__ import annotations
 
@@ -12,13 +12,13 @@ from packages.eval.visual_report import create_visual_report
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for visual report generation."""
     parser = argparse.ArgumentParser(
-        description="Combine V1 artifacts into a visual evaluation report."
+        description="Combine pipeline artifacts into a visual evaluation report."
     )
     parser.add_argument(
         "--template-image",
         type=Path,
-        default=TEMPLATES_DIR / "template_v1.png",
-        help="Path to the handwriting template image.",
+        default=TEMPLATES_DIR / "template_v2_page_1.png",
+        help="Template preview image. Defaults to V2 page 1.",
     )
     parser.add_argument(
         "--contact-sheet",

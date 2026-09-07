@@ -7,6 +7,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from packages.common.images import safe_save_image
 from packages.renderer.glyph_library import GlyphLibrary
 
 
@@ -20,21 +21,33 @@ def get_default_font(size: int) -> ImageFont.ImageFont:
 
 def create_glyph_contact_sheet(
     library: GlyphLibrary,
-    output_path: Path,
+    output_path: Path | str,
     cell_width: int = 120,
     cell_height: int = 100,
     columns: int = 6,
 ) -> Path:
     """Create a contact sheet image for visually inspecting extracted glyphs."""
+    output_path = Path(output_path)
     glyphs = library.glyphs
 
     if not glyphs:
         raise ValueError("Cannot create contact sheet from an empty glyph library.")
 
+    if len(glyphs) > 120:
+        columns = max(columns, 12)
+        cell_width = min(cell_width, 110)
+        cell_height = min(cell_height, 85)
+
     label_height = 24
     rows = (len(glyphs) + columns - 1) // columns
     sheet_width = columns * cell_width
     sheet_height = rows * (cell_height + label_height)
+
+    if sheet_width <= 0 or sheet_height <= 0:
+        raise ValueError(
+            "Contact sheet dimensions must be positive; "
+            f"calculated size=({sheet_width}, {sheet_height})."
+        )
 
     sheet = Image.new("RGB", (sheet_width, sheet_height), "white")
     draw = ImageDraw.Draw(sheet)
@@ -56,7 +69,8 @@ def create_glyph_contact_sheet(
         )
         draw.text((x0 + 5, y0 + 4), label, fill="black", font=font)
 
-        glyph_image = Image.open(glyph.image_path).convert("L")
+        with Image.open(glyph.image_path) as source_image:
+            glyph_image = source_image.convert("L")
         glyph_image.thumbnail((cell_width - 12, cell_height - 12))
 
         paste_x = x0 + (cell_width - glyph_image.width) // 2
@@ -64,10 +78,7 @@ def create_glyph_contact_sheet(
 
         sheet.paste(glyph_image.convert("RGB"), (paste_x, paste_y))
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    sheet.save(output_path)
-
-    return output_path
+    return safe_save_image(sheet, output_path)
 
 
 def create_visual_report(
@@ -159,9 +170,7 @@ def create_visual_report(
     else:
         draw.text((horizontal_padding, cursor_y + 13), "Generation record not available", "gray", body_font)
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    report.save(output_path)
-    return output_path
+    return safe_save_image(report, output_path)
 
 
 def _load_preview(image_path: Path, max_width: int, max_height: int) -> Image.Image | None:

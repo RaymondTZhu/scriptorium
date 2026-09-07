@@ -42,9 +42,10 @@ This project is not intended for:
 - generating handwriting from non-consenting people
 - removing generated-output labels or traceability records
 
-## Current V1 workflow
+## Current template workflow
 
-The current V1 uses a structured lowercase-only handwriting template.
+The original V1 uses a structured lowercase-only handwriting template. V2 adds three
+template pages for lowercase, uppercase, digits, punctuation, and common symbols.
 
 The local pipeline is:
 
@@ -57,26 +58,26 @@ The local pipeline is:
     -> visible generated-output footer
     -> JSON generation record
 
-## What V1 currently supports
+## What the project currently supports
 
 - generating a blank handwriting capture template
+- generating multi-page V2 handwriting capture templates
 - preprocessing template images into binary images
 - extracting glyph crops from known grid cells
 - saving glyph manifests
 - creating glyph contact sheets for visual inspection
-- rendering lowercase text from extracted glyph variants
+- rendering text from extracted glyph variants
 - adding a visible generated-output footer
 - writing JSON generation records
 - running a local V1 pipeline
 - running a minimal FastAPI service scaffold
 - running smoke tests
 
-## What V1 does not support yet
+## What the project does not support yet
 
 - robust phone-photo perspective correction
 - arbitrary handwriting page segmentation
 - cursive or connected-word segmentation
-- uppercase letters, digits, or punctuation in the active V1 template
 - high-quality style modeling
 - ML-based generation
 - browser-based sample approval
@@ -106,13 +107,21 @@ Install the project in editable mode with development dependencies:
 
     python experiments/scripts/create_template.py
 
-This creates:
+This defaults to V2 and creates:
 
-    templates/template_v1.png
+    templates/template_v2_page_1.png
+    templates/template_v2_page_2.png
+    templates/template_v2_page_3.png
+
+The lowercase-only V1 template remains available:
+
+    python experiments/scripts/create_template.py --template-metadata templates/template_v1.json
 
 ## Preprocess an image
 
-    python experiments/scripts/preprocess_image.py --input templates/template_v1.png --output data/processed/template_v1_binary.png
+Preprocess each completed V2 page before extraction. For example:
+
+    python experiments/scripts/preprocess_image.py --input templates/template_v2_page_1.png --output data/processed/template_v2_page_1_binary.png
 
 This creates a binary preprocessed image under:
 
@@ -120,11 +129,21 @@ This creates a binary preprocessed image under:
 
 ## Extract glyphs
 
-    python experiments/scripts/extract_glyphs.py --input templates/template_v1.png --user-id user_001
+Provide all three completed V2 pages in order:
+
+    python experiments/scripts/extract_glyphs.py --input-page data/raw/template_v2_page_1.png --input-page data/raw/template_v2_page_2.png --input-page data/raw/template_v2_page_3.png --user-id user_001
 
 This creates glyph crops and a manifest under:
 
     data/glyphs/user_001/
+
+The V2 metadata is selected automatically for `--input-page`. It can also be explicit:
+
+    python experiments/scripts/extract_glyphs.py --template-metadata templates/template_v2.json --input-page data/raw/template_v2_page_1.png --input-page data/raw/template_v2_page_2.png --input-page data/raw/template_v2_page_3.png --user-id user_001
+
+Legacy V1 extraction remains available:
+
+    python experiments/scripts/extract_glyphs.py --input templates/template_v1.png --user-id user_001
 
 ## Create a glyph contact sheet
 
@@ -146,7 +165,13 @@ and a JSON generation record under:
 
     data/manifests/
 
-## Run the full V1 pipeline
+## Run the full pipeline
+
+Run the pipeline with all three completed V2 pages:
+
+    python experiments/scripts/run_pipeline.py --input-page data/raw/template_v2_page_1.png --input-page data/raw/template_v2_page_2.png --input-page data/raw/template_v2_page_3.png --text "Hello, World! 123" --user-id user_001
+
+Legacy V1 input remains supported:
 
     python experiments/scripts/run_pipeline.py --input templates/template_v1.png --text "hello world" --user-id user_001
 
@@ -207,7 +232,8 @@ The current V1 assumes the input image matches the generated template layout clo
 
 It does not yet perform robust page detection, perspective correction, or phone-photo alignment. For best results, use the generated template image directly or a clean scan that preserves the same layout.
 
-The current active template is lowercase-only so the V1 fits on one page and remains easy to debug.
+The V1 template remains lowercase-only and fits on one page. V2 expands coverage across
+three pages while retaining the same structured-grid approach.
 
 The renderer is glyph-based and procedural. It does not yet learn a deep style representation or generate new strokes with a neural model.
 
@@ -221,5 +247,5 @@ Planned next steps include:
 - adding a visual evaluation report command
 - adding API endpoints for upload and generation
 - adding a frontend for sample upload and output preview
-- expanding the template to uppercase letters, digits, and punctuation
+- refining multi-page template capture and alignment
 - exploring lightweight ML-based style evaluation

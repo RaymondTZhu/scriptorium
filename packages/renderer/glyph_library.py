@@ -79,6 +79,8 @@ def load_glyph_library(manifest_path: Path) -> GlyphLibrary:
                 width=record.get("width"),
                 height=record.get("height"),
                 has_ink=record.get("has_ink", not quality.get("probably_empty", False)),
+                page_number=record.get("page_number", 1),
+                template_version=record.get("template_version", manifest.get("template_version")),
             )
         )
 

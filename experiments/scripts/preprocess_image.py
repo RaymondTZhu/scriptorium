@@ -2,8 +2,8 @@
 
 Example:
     python experiments/scripts/preprocess_image.py \
-        --input templates/template_v1.png \
-        --output data/processed/template_v1_binary.png
+        --input templates/template_v2_page_1.png \
+        --output data/processed/template_v2_page_1_binary.png
 """
 
 from __future__ import annotations

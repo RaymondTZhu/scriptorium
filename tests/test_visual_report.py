@@ -5,11 +5,45 @@ import shutil
 
 from PIL import Image
 
-from packages.common.paths import PROJECT_ROOT
-from packages.eval.visual_report import create_visual_report
+from packages.common.paths import PROJECT_ROOT, sanitize_path_component
+from packages.common.types import GlyphRecord
+from packages.eval.visual_report import create_glyph_contact_sheet, create_visual_report
+from packages.renderer.glyph_library import GlyphLibrary
 
 
 TEST_SCRATCH_DIR = PROJECT_ROOT / ".tmp_tests" / "visual_report"
+
+
+def test_create_glyph_contact_sheet_writes_normal_path() -> None:
+    """A contact sheet should save into a project-local glyph output folder."""
+    if TEST_SCRATCH_DIR.exists():
+        shutil.rmtree(TEST_SCRATCH_DIR)
+
+    glyph_dir = TEST_SCRATCH_DIR / "glyphs" / sanitize_path_component("test/user")
+    glyph_path = glyph_dir / "glyph.png"
+    output_path = glyph_dir / "glyph_contact_sheet.png"
+    glyph_dir.mkdir(parents=True, exist_ok=True)
+    Image.new("L", (20, 30), "white").save(glyph_path)
+    library = GlyphLibrary(
+        [
+            GlyphRecord(
+                user_id="test/user",
+                character="a",
+                variant_id=1,
+                image_path=glyph_path,
+            )
+        ]
+    )
+
+    try:
+        result = create_glyph_contact_sheet(library, output_path)
+
+        assert result == output_path
+        assert output_path.exists()
+        assert output_path.stat().st_size > 0
+        assert output_path.parent.name == "test_user"
+    finally:
+        shutil.rmtree(PROJECT_ROOT / ".tmp_tests", ignore_errors=True)
 
 
 def test_create_visual_report_writes_nonempty_png() -> None:

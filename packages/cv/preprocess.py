@@ -7,10 +7,55 @@ binary image for later template segmentation and glyph extraction.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
 import numpy as np
+from PIL import Image
+
+from packages.common.images import safe_save_image
+
+
+@dataclass(frozen=True)
+class PageNormalizationResult:
+    """Details about one normalized template page."""
+
+    input_path: Path
+    output_path: Path
+    original_size: tuple[int, int]
+    expected_size: tuple[int, int]
+    resized: bool
+
+
+def normalize_template_page(
+    input_path: Path,
+    output_path: Path,
+    expected_width: int,
+    expected_height: int,
+) -> PageNormalizationResult:
+    """Copy or resize a template page to its metadata-defined dimensions."""
+    expected_size = (expected_width, expected_height)
+
+    with Image.open(input_path) as source_image:
+        original_size = source_image.size
+        if original_size == expected_size:
+            normalized_image = source_image.copy()
+        else:
+            normalized_image = source_image.resize(
+                expected_size,
+                resample=Image.Resampling.LANCZOS,
+            )
+
+    safe_save_image(normalized_image, output_path)
+
+    return PageNormalizationResult(
+        input_path=input_path,
+        output_path=output_path,
+        original_size=original_size,
+        expected_size=expected_size,
+        resized=original_size != expected_size,
+    )
 
 
 def load_image(image_path: Path) -> np.ndarray:

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+from packages.common.images import safe_save_image
 from packages.renderer.glyph_library import GlyphLibrary
 from packages.renderer.layout import RendererVariationConfig, RenderSettings
 from packages.renderer.perturb import jitter_int, jitter_scale
@@ -100,10 +101,7 @@ def render_text_to_image(
             rng,
         )
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    canvas.save(output_path)
-
-    return output_path
+    return safe_save_image(canvas, output_path)
 
 
 def _glyph_advance(

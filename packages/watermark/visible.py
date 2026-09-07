@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from packages.common.images import safe_save_image
 
 def get_default_font(size: int) -> ImageFont.ImageFont:
     """Return a portable default font."""
@@ -54,7 +55,4 @@ def add_visible_provenance_footer(
     )
     draw.text((12, footer_y + 11), label, fill="black", font=font)
 
-    save_path.parent.mkdir(parents=True, exist_ok=True)
-    labeled_image.save(save_path)
-
-    return save_path
+    return safe_save_image(labeled_image, save_path)

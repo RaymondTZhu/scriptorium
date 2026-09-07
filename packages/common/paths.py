@@ -4,6 +4,7 @@ This module centralizes important filesystem paths so the rest of the
 project does not need to hard-code relative paths repeatedly.
 """
 
+import re
 from pathlib import Path
 
 
@@ -21,6 +22,21 @@ TEMPLATES_DIR = PROJECT_ROOT / "templates"
 EXPERIMENTS_DIR = PROJECT_ROOT / "experiments"
 EXPERIMENT_SCRIPTS_DIR = EXPERIMENTS_DIR / "scripts"
 EXPERIMENT_RESULTS_DIR = EXPERIMENTS_DIR / "results"
+
+
+def sanitize_path_component(value: str, fallback: str = "user") -> str:
+    """Return a Windows-safe folder name for a user-provided path component."""
+    sanitized = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", value).strip(" .")
+    if not sanitized:
+        sanitized = fallback
+
+    windows_reserved_names = {"CON", "PRN", "AUX", "NUL"}
+    windows_reserved_names.update(f"COM{number}" for number in range(1, 10))
+    windows_reserved_names.update(f"LPT{number}" for number in range(1, 10))
+    if sanitized.upper() in windows_reserved_names:
+        sanitized = f"{sanitized}_"
+
+    return sanitized
 
 
 def ensure_project_dirs() -> None:

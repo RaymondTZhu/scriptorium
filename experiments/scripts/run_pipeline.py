@@ -1,9 +1,11 @@
-"""Run the complete V1 Scriptorium pipeline.
+"""Run the complete Scriptorium pipeline.
 
 Example:
     python experiments/scripts/run_pipeline.py \
-        --input templates/template_v1.png \
-        --text "hello world" \
+        --input-page templates/template_v2_page_1.png \
+        --input-page templates/template_v2_page_2.png \
+        --input-page templates/template_v2_page_3.png \
+        --text "Hello, World! 123" \
         --user-id user_001
 """
 
@@ -18,10 +20,21 @@ from packages.common.paths import (
     GLYPH_DATA_DIR,
     OUTPUT_DATA_DIR,
     PROCESSED_DATA_DIR,
+    TEMPLATES_DIR,
     ensure_project_dirs,
+    sanitize_path_component,
 )
-from packages.cv.glyph_extract import extract_glyphs_from_template
-from packages.cv.preprocess import preprocess_image
+from packages.cv.glyph_extract import extract_glyphs_from_template_pages
+from packages.cv.preprocess import (
+    PageNormalizationResult,
+    normalize_template_page,
+    preprocess_image,
+)
+from packages.cv.segment import (
+    load_template_metadata,
+    select_template_metadata_path,
+    validate_template_input_count,
+)
 from packages.eval.visual_report import create_glyph_contact_sheet, create_visual_report
 from packages.renderer.glyph_library import load_glyph_library
 from packages.renderer.layout import RendererVariationConfig, RenderSettings
@@ -36,11 +49,28 @@ def parse_args() -> argparse.Namespace:
         description="Run preprocessing, glyph extraction, rendering, and provenance export."
     )
 
-    parser.add_argument(
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument(
         "--input",
-        required=True,
         type=Path,
-        help="Path to a completed handwriting template image.",
+        help="Path to one completed V1 handwriting template image.",
+    )
+
+    input_group.add_argument(
+        "--input-page",
+        action="append",
+        type=Path,
+        help="Completed V2 page path; repeat once for each page in order.",
+    )
+
+    parser.add_argument(
+        "--template-metadata",
+        type=Path,
+        default=None,
+        help=(
+            "Template metadata JSON. Defaults to template_v2.json for "
+            "--input-page and template_v1.json for legacy --input."
+        ),
     )
 
     parser.add_argument(
@@ -106,12 +136,64 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def normalize_and_preprocess_pages(
+    input_paths: list[Path],
+    metadata: dict,
+    normalized_paths: list[Path],
+    processed_paths: list[Path],
+) -> tuple[list[PageNormalizationResult], list[Path]]:
+    """Normalize template pages before creating extraction-ready images."""
+    expected_width = metadata["page"]["width_px"]
+    expected_height = metadata["page"]["height_px"]
+    results: list[PageNormalizationResult] = []
+
+    for input_path, normalized_path, processed_path in zip(
+        input_paths,
+        normalized_paths,
+        processed_paths,
+        strict=True,
+    ):
+        result = normalize_template_page(
+            input_path=input_path,
+            output_path=normalized_path,
+            expected_width=expected_width,
+            expected_height=expected_height,
+        )
+        results.append(result)
+        preprocess_image(input_path=normalized_path, output_path=processed_path)
+
+    return results, processed_paths
+
+
+def print_normalization_diagnostic(result: PageNormalizationResult) -> None:
+    """Print the source and destination geometry for one template page."""
+    print(
+        "Template page normalization: "
+        f"input={result.input_path}, original_size={result.original_size}, "
+        f"expected_size={result.expected_size}, resized={result.resized}, "
+        f"output={result.output_path}"
+    )
+
+
 def main() -> None:
     """Run the complete V1 local pipeline."""
     args = parse_args()
     ensure_project_dirs()
 
     run_id = create_run_id()
+    input_paths = args.input_page or [args.input]
+    metadata_path = select_template_metadata_path(
+        args.template_metadata,
+        multi_page=bool(args.input_page),
+    )
+    metadata = load_template_metadata(metadata_path)
+    validate_template_input_count(metadata, len(input_paths), metadata_path)
+
+    try:
+        display_metadata_path = metadata_path.relative_to(TEMPLATES_DIR.parent)
+    except ValueError:
+        display_metadata_path = metadata_path
+    print(f"Using template metadata: {display_metadata_path}")
     variation = RendererVariationConfig(
         seed=args.seed,
         x_jitter_px=max(0, args.x_jitter_px),
@@ -121,22 +203,38 @@ def main() -> None:
         line_spacing_jitter_px=max(0, args.line_spacing_jitter_px),
     )
 
-    processed_path = PROCESSED_DATA_DIR / f"{run_id}_binary.png"
-    glyph_output_dir = GLYPH_DATA_DIR / args.user_id
+    if len(input_paths) == 1:
+        normalized_paths = [PROCESSED_DATA_DIR / f"{run_id}_normalized.png"]
+        processed_paths = [PROCESSED_DATA_DIR / f"{run_id}_binary.png"]
+    else:
+        normalized_paths = [
+            PROCESSED_DATA_DIR / f"{run_id}_page_{index}_normalized.png"
+            for index in range(1, len(input_paths) + 1)
+        ]
+        processed_paths = [
+            PROCESSED_DATA_DIR / f"{run_id}_page_{index}_binary.png"
+            for index in range(1, len(input_paths) + 1)
+        ]
+    glyph_output_dir = GLYPH_DATA_DIR / sanitize_path_component(args.user_id)
     contact_sheet_path = glyph_output_dir / "glyph_contact_sheet.png"
     rendered_output_path = OUTPUT_DATA_DIR / f"{run_id}_rendered_text.png"
     latest_rendered_output_path = OUTPUT_DATA_DIR / "rendered_text.png"
     visual_report_path = OUTPUT_DATA_DIR / "visual_report.png"
 
-    preprocess_image(
-        input_path=args.input,
-        output_path=processed_path,
+    normalization_results, processed_paths = normalize_and_preprocess_pages(
+        input_paths=input_paths,
+        metadata=metadata,
+        normalized_paths=normalized_paths,
+        processed_paths=processed_paths,
     )
+    for result in normalization_results:
+        print_normalization_diagnostic(result)
 
-    glyph_manifest_path = extract_glyphs_from_template(
-        input_path=processed_path,
+    glyph_manifest_path = extract_glyphs_from_template_pages(
+        input_paths=processed_paths,
         user_id=args.user_id,
         output_dir=glyph_output_dir,
+        metadata_path=metadata_path,
     )
 
     library = load_glyph_library(glyph_manifest_path)
@@ -164,8 +262,13 @@ def main() -> None:
         run_id=run_id,
         extra_fields={
             "pipeline": "v1",
-            "input_image_path": str(args.input),
-            "processed_image_path": str(processed_path),
+            "input_image_path": str(input_paths[0]) if len(input_paths) == 1 else None,
+            "input_image_paths": [str(path) for path in input_paths],
+            "normalized_image_paths": [str(path) for path in normalized_paths],
+            "processed_image_path": (
+                str(processed_paths[0]) if len(processed_paths) == 1 else None
+            ),
+            "processed_image_paths": [str(path) for path in processed_paths],
             "glyph_manifest_path": str(glyph_manifest_path),
             "contact_sheet_path": str(contact_sheet_path),
             "visible_provenance_enabled": True,
@@ -175,7 +278,7 @@ def main() -> None:
 
     report_created = False
     required_report_artifacts = (
-        args.input,
+        normalized_paths[0],
         contact_sheet_path,
         latest_rendered_output_path,
         provenance_manifest_path,
@@ -183,7 +286,7 @@ def main() -> None:
 
     if not args.skip_visual_report and all(path.exists() for path in required_report_artifacts):
         create_visual_report(
-            template_image_path=args.input,
+            template_image_path=normalized_paths[0],
             contact_sheet_path=contact_sheet_path,
             rendered_output_path=latest_rendered_output_path,
             generation_record_path=provenance_manifest_path,
@@ -191,7 +294,8 @@ def main() -> None:
         )
         report_created = True
 
-    print(f"Saved processed image: {processed_path}")
+    for processed_path in processed_paths:
+        print(f"Saved processed image: {processed_path}")
     print(f"Saved glyph manifest: {glyph_manifest_path}")
     print(f"Saved contact sheet: {contact_sheet_path}")
     print(f"Saved rendered output: {output_path}")

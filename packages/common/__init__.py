@@ -1,6 +1,7 @@
 """Shared utilities and data models for Scriptorium."""
 
 from packages.common.config import ProjectConfig
+from packages.common.images import safe_save_image
 from packages.common.paths import (
     DATA_DIR,
     DOCS_DIR,
@@ -36,4 +37,5 @@ __all__ = [
     "RAW_DATA_DIR",
     "TEMPLATES_DIR",
     "ensure_project_dirs",
+    "safe_save_image",
 ]

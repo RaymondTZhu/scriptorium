@@ -40,6 +40,8 @@ class GlyphRecord:
     width: int | None = None
     height: int | None = None
     has_ink: bool = True
+    page_number: int = 1
+    template_version: str | None = None
 
 
 @dataclass(frozen=True)

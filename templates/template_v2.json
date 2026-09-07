@@ -1,0 +1,64 @@
+{
+  "template_id": "template_v2",
+  "template_version": "0.2.0",
+  "project_name": "scriptorium",
+  "description": "Multi-page structured handwriting capture template for consent-based glyph extraction.",
+  "page_count": 3,
+  "page": {
+    "width_px": 1700,
+    "height_px": 2200,
+    "dpi": 200,
+    "paper_size": "letter",
+    "orientation": "portrait"
+  },
+  "layout": {
+    "columns": 6,
+    "rows_per_page": 13,
+    "cell_width_px": 240,
+    "cell_height_px": 120,
+    "cell_gap_x_px": 20,
+    "cell_gap_y_px": 28,
+    "margin_left_px": 100,
+    "margin_top_px": 260,
+    "label_height_px": 28,
+    "writing_area_height_px": 92
+  },
+  "character_groups": {
+    "lowercase": "abcdefghijklmnopqrstuvwxyz",
+    "uppercase": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    "digits": "0123456789",
+    "punctuation": ".,!?;:'\"-_()[]/\\",
+    "symbols": "@#$%&*+=<>"
+  },
+  "variants_per_character": 3,
+  "pages": [
+    {
+      "page_number": 1,
+      "name": "lowercase",
+      "character_groups": ["lowercase"],
+      "variants_per_character": 3
+    },
+    {
+      "page_number": 2,
+      "name": "uppercase",
+      "character_groups": ["uppercase"],
+      "variants_per_character": 3
+    },
+    {
+      "page_number": 3,
+      "name": "digits_punctuation_symbols",
+      "character_groups": ["digits", "punctuation", "symbols"],
+      "variants_per_character": 2
+    }
+  ],
+  "provenance_notice": {
+    "title": "Consent-Based Handwriting Capture",
+    "body": "Use only your own handwriting or handwriting from someone who has explicitly consented. Generated outputs should include provenance."
+  },
+  "instructions": "Write each labeled character inside its box without touching the border.",
+  "notes": [
+    "V2 uses three pages so a practical full character set fits with multiple variants.",
+    "Page 1 contains lowercase letters, page 2 uppercase letters, and page 3 digits, punctuation, and common symbols.",
+    "The lowercase-only template_v1 remains supported for compatibility."
+  ]
+}
