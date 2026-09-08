@@ -155,7 +155,17 @@ This creates:
 
 ## Render text
 
+Render text directly:
+
     python experiments/scripts/render_text.py --manifest data/glyphs/user_001/glyph_manifest.json --text "hello world"
+
+Or generate short text from a prompt before rendering:
+
+    python experiments/scripts/render_text.py --manifest data/glyphs/user_001/glyph_manifest.json --prompt "write a short thank-you note to my professor"
+
+The default `local` text provider is a deterministic, network-free stub. A future provider
+can connect a real text-generation service, but the handwriting renderer itself remains a
+procedural glyph-based system rather than a neural handwriting model.
 
 This creates:
 
@@ -170,6 +180,10 @@ and a JSON generation record under:
 Run the pipeline with all three completed V2 pages:
 
     python experiments/scripts/run_pipeline.py --input-page data/raw/template_v2_page_1.png --input-page data/raw/template_v2_page_2.png --input-page data/raw/template_v2_page_3.png --text "Hello, World! 123" --user-id user_001
+
+The full pipeline also accepts `--prompt` instead of `--text`:
+
+    python experiments/scripts/run_pipeline.py --input-page data/raw/template_v2_page_1.png --input-page data/raw/template_v2_page_2.png --input-page data/raw/template_v2_page_3.png --prompt "write a short thank-you note to my professor" --user-id user_001
 
 Legacy V1 input remains supported:
 

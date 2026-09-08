@@ -13,6 +13,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from packages.common.paths import OUTPUT_DATA_DIR, ensure_project_dirs
+from packages.generation import select_text_for_rendering
 from packages.renderer.glyph_library import load_glyph_library
 from packages.renderer.layout import RendererVariationConfig, RenderSettings
 from packages.renderer.render_png import render_text_to_image
@@ -35,8 +36,18 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--text",
-        required=True,
-        help="Text to render. V1 works best with lowercase letters and spaces.",
+        help="Text to render directly. Cannot be combined with --prompt.",
+    )
+
+    parser.add_argument(
+        "--prompt",
+        help="Prompt used to generate text. Cannot be combined with --text.",
+    )
+
+    parser.add_argument(
+        "--text-provider",
+        default="local",
+        help="Prompt-to-text provider. Only the deterministic local provider is implemented.",
     )
 
     parser.add_argument(
@@ -108,6 +119,15 @@ def main() -> None:
     args = parse_args()
     ensure_project_dirs()
 
+    text_result = select_text_for_rendering(
+        text=args.text,
+        prompt=args.prompt,
+        provider=args.text_provider,
+    )
+    final_text = text_result.generated_text
+    if text_result.prompt:
+        print(f"Generated text: {final_text}")
+
     library = load_glyph_library(args.manifest)
     settings = RenderSettings()
     variation = RendererVariationConfig(
@@ -121,7 +141,7 @@ def main() -> None:
     run_id = create_run_id()
 
     output_path = render_text_to_image(
-        text=args.text,
+        text=final_text,
         library=library,
         output_path=args.output,
         settings=settings,
@@ -133,13 +153,18 @@ def main() -> None:
 
     manifest_path = write_generation_manifest(
         user_id=args.user_id,
-        input_text=args.text,
+        input_text=final_text,
         output_image_path=output_path,
         run_id=run_id,
         extra_fields={
             "glyph_manifest_path": str(args.manifest),
             "visible_provenance_enabled": not args.disable_visible_provenance,
             "renderer_config": asdict(variation),
+            "source_prompt": text_result.prompt or None,
+            "generated_text": final_text,
+            "text_provider": text_result.provider,
+            "text_model": text_result.model,
+            "used_text_generation_fallback": text_result.used_fallback,
         },
     )
 

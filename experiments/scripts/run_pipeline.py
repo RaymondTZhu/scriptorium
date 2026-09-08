@@ -36,6 +36,7 @@ from packages.cv.segment import (
     validate_template_input_count,
 )
 from packages.eval.visual_report import create_glyph_contact_sheet, create_visual_report
+from packages.generation import select_text_for_rendering
 from packages.renderer.glyph_library import load_glyph_library
 from packages.renderer.layout import RendererVariationConfig, RenderSettings
 from packages.renderer.render_png import render_text_to_image
@@ -75,8 +76,18 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--text",
-        required=True,
-        help="Text to render with extracted glyphs.",
+        help="Text to render directly. Cannot be combined with --prompt.",
+    )
+
+    parser.add_argument(
+        "--prompt",
+        help="Prompt used to generate text. Cannot be combined with --text.",
+    )
+
+    parser.add_argument(
+        "--text-provider",
+        default="local",
+        help="Prompt-to-text provider. Only the deterministic local provider is implemented.",
     )
 
     parser.add_argument(
@@ -180,6 +191,15 @@ def main() -> None:
     args = parse_args()
     ensure_project_dirs()
 
+    text_result = select_text_for_rendering(
+        text=args.text,
+        prompt=args.prompt,
+        provider=args.text_provider,
+    )
+    final_text = text_result.generated_text
+    if text_result.prompt:
+        print(f"Generated text: {final_text}")
+
     run_id = create_run_id()
     input_paths = args.input_page or [args.input]
     metadata_path = select_template_metadata_path(
@@ -245,7 +265,7 @@ def main() -> None:
     )
 
     output_path = render_text_to_image(
-        text=args.text,
+        text=final_text,
         library=library,
         output_path=rendered_output_path,
         settings=RenderSettings(),
@@ -257,7 +277,7 @@ def main() -> None:
 
     provenance_manifest_path = write_generation_manifest(
         user_id=args.user_id,
-        input_text=args.text,
+        input_text=final_text,
         output_image_path=output_path,
         run_id=run_id,
         extra_fields={
@@ -273,6 +293,11 @@ def main() -> None:
             "contact_sheet_path": str(contact_sheet_path),
             "visible_provenance_enabled": True,
             "renderer_config": asdict(variation),
+            "source_prompt": text_result.prompt or None,
+            "generated_text": final_text,
+            "text_provider": text_result.provider,
+            "text_model": text_result.model,
+            "used_text_generation_fallback": text_result.used_fallback,
         },
     )
 
