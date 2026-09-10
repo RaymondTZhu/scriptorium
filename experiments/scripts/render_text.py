@@ -13,7 +13,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from packages.common.paths import OUTPUT_DATA_DIR, ensure_project_dirs
-from packages.generation import select_text_for_rendering
+from packages.generation import select_text_for_rendering, text_generation_metadata
 from packages.renderer.glyph_library import load_glyph_library
 from packages.renderer.layout import RendererVariationConfig, RenderSettings
 from packages.renderer.render_png import render_text_to_image
@@ -46,8 +46,22 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--text-provider",
+        choices=("local", "openai"),
         default="local",
-        help="Prompt-to-text provider. Only the deterministic local provider is implemented.",
+        help="Prompt-to-text provider. Defaults to the deterministic local provider.",
+    )
+
+    parser.add_argument(
+        "--text-model",
+        default=None,
+        help="Optional text-generation model. OpenAI defaults to gpt-5.5.",
+    )
+
+    parser.add_argument(
+        "--max-generated-chars",
+        type=int,
+        default=500,
+        help="Maximum generated text length; longer provider output is truncated.",
     )
 
     parser.add_argument(
@@ -55,6 +69,34 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=OUTPUT_DATA_DIR / "rendered_text.png",
         help="Path where the rendered image should be saved.",
+    )
+
+    parser.add_argument(
+        "--page-width",
+        type=int,
+        default=1200,
+        help="Rendered page width in pixels.",
+    )
+
+    parser.add_argument(
+        "--max-line-width",
+        type=int,
+        default=1080,
+        help="Maximum text width before word wrapping.",
+    )
+
+    parser.add_argument(
+        "--margin-px",
+        type=int,
+        default=60,
+        help="Page margin in pixels.",
+    )
+
+    parser.add_argument(
+        "--line-spacing-px",
+        type=int,
+        default=95,
+        help="Vertical advance between rendered lines.",
     )
 
     parser.add_argument(
@@ -123,13 +165,22 @@ def main() -> None:
         text=args.text,
         prompt=args.prompt,
         provider=args.text_provider,
+        model=args.text_model,
+        max_chars=args.max_generated_chars,
     )
     final_text = text_result.generated_text
     if text_result.prompt:
         print(f"Generated text: {final_text}")
 
     library = load_glyph_library(args.manifest)
-    settings = RenderSettings()
+    settings = RenderSettings(
+        canvas_width=args.page_width,
+        max_line_width=args.max_line_width,
+        margin_left=args.margin_px,
+        margin_top=args.margin_px,
+        margin_bottom=args.margin_px,
+        line_height=args.line_spacing_px,
+    )
     variation = RendererVariationConfig(
         seed=args.seed,
         x_jitter_px=max(0, args.x_jitter_px),
@@ -159,12 +210,14 @@ def main() -> None:
         extra_fields={
             "glyph_manifest_path": str(args.manifest),
             "visible_provenance_enabled": not args.disable_visible_provenance,
-            "renderer_config": asdict(variation),
-            "source_prompt": text_result.prompt or None,
-            "generated_text": final_text,
-            "text_provider": text_result.provider,
-            "text_model": text_result.model,
-            "used_text_generation_fallback": text_result.used_fallback,
+            "renderer_config": {
+                **asdict(variation),
+                "page_width": settings.canvas_width,
+                "max_line_width": settings.max_line_width,
+                "margin_px": args.margin_px,
+                "line_spacing_px": settings.line_height,
+            },
+            **text_generation_metadata(text_result, args.max_generated_chars),
         },
     )
 

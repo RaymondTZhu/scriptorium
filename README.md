@@ -163,9 +163,15 @@ Or generate short text from a prompt before rendering:
 
     python experiments/scripts/render_text.py --manifest data/glyphs/user_001/glyph_manifest.json --prompt "write a short thank-you note to my professor"
 
-The default `local` text provider is a deterministic, network-free stub. A future provider
-can connect a real text-generation service, but the handwriting renderer itself remains a
-procedural glyph-based system rather than a neural handwriting model.
+The default `local` text provider is a deterministic, network-free stub. The optional OpenAI
+provider generates text content through the Responses API and requires `OPENAI_API_KEY`:
+
+    python -m pip install -e ".[ai]"
+    python experiments/scripts/render_text.py --manifest data/glyphs/user_001/glyph_manifest.json --prompt "write a short thank-you note to my professor" --text-provider openai --text-model gpt-5.5
+
+The same provider options work with the full pipeline. Generated provider output is truncated
+to 500 characters by default; use `--max-generated-chars` to change that limit. The handwriting
+renderer itself remains a procedural glyph-based system rather than a neural handwriting model.
 
 This creates:
 

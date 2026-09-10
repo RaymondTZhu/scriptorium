@@ -22,11 +22,14 @@ class RenderSettings:
     """Basic rendering settings for V1 handwritten-style output."""
 
     canvas_width: int = 1200
-    canvas_height: int = 500
+    canvas_height: int = 0
+    max_line_width: int | None = None
     margin_left: int = 60
     margin_top: int = 80
+    margin_bottom: int = 60
     line_height: int = 95
     glyph_height: int = 70
     character_spacing: int = 8
     word_spacing: int = 38
     placeholder_width: int = 36
+    footer_spacing: int = 12

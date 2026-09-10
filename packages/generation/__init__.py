@@ -4,10 +4,12 @@ from packages.generation.text_prompt import (
     GeneratedTextResult,
     generate_text_from_prompt,
     select_text_for_rendering,
+    text_generation_metadata,
 )
 
 __all__ = [
     "GeneratedTextResult",
     "generate_text_from_prompt",
     "select_text_for_rendering",
+    "text_generation_metadata",
 ]

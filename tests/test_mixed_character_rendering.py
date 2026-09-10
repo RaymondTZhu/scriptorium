@@ -70,6 +70,7 @@ def test_library_loads_and_renders_mixed_v2_text() -> None:
         assert output_path.exists()
         assert output_path.stat().st_size > 0
         with Image.open(output_path) as rendered:
-            assert rendered.size == (900, 180)
+            assert rendered.width == 900
+            assert rendered.height >= 180
     finally:
         shutil.rmtree(PROJECT_ROOT / ".tmp_tests", ignore_errors=True)

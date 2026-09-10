@@ -36,7 +36,7 @@ from packages.cv.segment import (
     validate_template_input_count,
 )
 from packages.eval.visual_report import create_glyph_contact_sheet, create_visual_report
-from packages.generation import select_text_for_rendering
+from packages.generation import select_text_for_rendering, text_generation_metadata
 from packages.renderer.glyph_library import load_glyph_library
 from packages.renderer.layout import RendererVariationConfig, RenderSettings
 from packages.renderer.render_png import render_text_to_image
@@ -86,14 +86,56 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--text-provider",
+        choices=("local", "openai"),
         default="local",
-        help="Prompt-to-text provider. Only the deterministic local provider is implemented.",
+        help="Prompt-to-text provider. Defaults to the deterministic local provider.",
+    )
+
+    parser.add_argument(
+        "--text-model",
+        default=None,
+        help="Optional text-generation model. OpenAI defaults to gpt-5.5.",
+    )
+
+    parser.add_argument(
+        "--max-generated-chars",
+        type=int,
+        default=500,
+        help="Maximum generated text length; longer provider output is truncated.",
     )
 
     parser.add_argument(
         "--user-id",
         default="user_001",
         help="Identifier for the handwriting sample owner.",
+    )
+
+    parser.add_argument(
+        "--page-width",
+        type=int,
+        default=1200,
+        help="Rendered page width in pixels.",
+    )
+
+    parser.add_argument(
+        "--max-line-width",
+        type=int,
+        default=1080,
+        help="Maximum text width before word wrapping.",
+    )
+
+    parser.add_argument(
+        "--margin-px",
+        type=int,
+        default=60,
+        help="Rendered page margin in pixels.",
+    )
+
+    parser.add_argument(
+        "--line-spacing-px",
+        type=int,
+        default=95,
+        help="Vertical advance between rendered lines.",
     )
 
     parser.add_argument(
@@ -195,6 +237,8 @@ def main() -> None:
         text=args.text,
         prompt=args.prompt,
         provider=args.text_provider,
+        model=args.text_model,
+        max_chars=args.max_generated_chars,
     )
     final_text = text_result.generated_text
     if text_result.prompt:
@@ -221,6 +265,14 @@ def main() -> None:
         scale_jitter=max(0.0, args.scale_jitter),
         spacing_jitter_px=max(0, args.spacing_jitter_px),
         line_spacing_jitter_px=max(0, args.line_spacing_jitter_px),
+    )
+    render_settings = RenderSettings(
+        canvas_width=args.page_width,
+        max_line_width=args.max_line_width,
+        margin_left=args.margin_px,
+        margin_top=args.margin_px,
+        margin_bottom=args.margin_px,
+        line_height=args.line_spacing_px,
     )
 
     if len(input_paths) == 1:
@@ -268,7 +320,7 @@ def main() -> None:
         text=final_text,
         library=library,
         output_path=rendered_output_path,
-        settings=RenderSettings(),
+        settings=render_settings,
         variation=variation,
     )
 
@@ -292,12 +344,14 @@ def main() -> None:
             "glyph_manifest_path": str(glyph_manifest_path),
             "contact_sheet_path": str(contact_sheet_path),
             "visible_provenance_enabled": True,
-            "renderer_config": asdict(variation),
-            "source_prompt": text_result.prompt or None,
-            "generated_text": final_text,
-            "text_provider": text_result.provider,
-            "text_model": text_result.model,
-            "used_text_generation_fallback": text_result.used_fallback,
+            "renderer_config": {
+                **asdict(variation),
+                "page_width": render_settings.canvas_width,
+                "max_line_width": render_settings.max_line_width,
+                "margin_px": args.margin_px,
+                "line_spacing_px": render_settings.line_height,
+            },
+            **text_generation_metadata(text_result, args.max_generated_chars),
         },
     )
 

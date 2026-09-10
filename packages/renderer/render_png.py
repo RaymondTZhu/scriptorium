@@ -1,8 +1,10 @@
-"""PNG renderer for composing text from extracted glyph images."""
+"""PNG renderer with word wrapping and dynamic canvas sizing."""
 
 from __future__ import annotations
 
 import random
+import re
+from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -13,6 +15,42 @@ from packages.renderer.layout import RendererVariationConfig, RenderSettings
 from packages.renderer.perturb import jitter_int, jitter_scale
 
 
+@dataclass(frozen=True)
+class PlacedGlyph:
+    """One glyph or placeholder positioned on the final canvas."""
+
+    character: str
+    x: int
+    y: int
+    width: int
+    height: int
+    line_index: int
+    image: Image.Image | None
+
+
+@dataclass(frozen=True)
+class RenderLayout:
+    """Computed glyph positions and dynamic output dimensions."""
+
+    glyphs: list[PlacedGlyph]
+    width: int
+    height: int
+    line_count: int
+
+
+@dataclass(frozen=True)
+class _GlyphPlan:
+    """Seeded glyph measurements before absolute placement."""
+
+    character: str
+    width: int
+    height: int
+    advance: int
+    x_jitter: int
+    y_jitter: int
+    image: Image.Image | None
+
+
 def render_text_to_image(
     text: str,
     library: GlyphLibrary,
@@ -21,87 +59,194 @@ def render_text_to_image(
     seed: int | None = 7,
     variation: RendererVariationConfig | None = None,
 ) -> Path:
-    """Render text into a PNG image using extracted glyph variants."""
+    """Lay out and render text into a dynamically sized PNG image."""
     active_settings = settings or RenderSettings()
     active_variation = variation or RendererVariationConfig(seed=seed)
-    rng = random.Random(active_variation.seed)
+    layout = plan_text_layout(text, library, active_settings, active_variation)
 
-    canvas = Image.new(
-        "RGB",
-        (active_settings.canvas_width, active_settings.canvas_height),
-        "white",
-    )
+    canvas = Image.new("RGB", (layout.width, layout.height), "white")
     draw = ImageDraw.Draw(canvas)
 
-    cursor_x = active_settings.margin_left
-    cursor_y = active_settings.margin_top
-
-    for character in text:
-        if character == "\n":
-            cursor_x = active_settings.margin_left
-            cursor_y += _line_advance(active_settings, active_variation, rng)
-            continue
-
-        if character == " ":
-            cursor_x += active_settings.word_spacing
-            continue
-
-        if cursor_x > active_settings.canvas_width - active_settings.margin_left:
-            cursor_x = active_settings.margin_left
-            cursor_y += _line_advance(active_settings, active_variation, rng)
-
-        if cursor_y > active_settings.canvas_height - active_settings.margin_top:
-            break
-
-        if not library.has_character(character):
+    for glyph in layout.glyphs:
+        if glyph.image is None:
             draw_unsupported_character_placeholder(
                 draw=draw,
-                x=cursor_x,
-                y=cursor_y,
-                width=active_settings.placeholder_width,
-                height=active_settings.glyph_height,
+                x=glyph.x,
+                y=glyph.y,
+                width=glyph.width,
+                height=glyph.height,
             )
-            cursor_x += _glyph_advance(
-                active_settings.placeholder_width,
-                active_settings,
-                active_variation,
-                rng,
-            )
-            continue
-
-        glyph_record = library.sample_variant(character, rng=rng)
-        with Image.open(glyph_record.image_path) as source_image:
-            glyph_image = source_image.convert("L")
-
-        scale = jitter_scale(active_variation.scale_jitter, rng)
-        target_height = max(1, round(active_settings.glyph_height * scale))
-        glyph_image.thumbnail((target_height, target_height))
-
-        paste_x = max(
-            0,
-            jitter_int(
-                base_value=cursor_x,
-                max_abs_jitter=active_variation.x_jitter_px,
-                rng=rng,
-            ),
-        )
-
-        paste_y = jitter_int(
-            base_value=cursor_y,
-            max_abs_jitter=active_variation.y_jitter_px,
-            rng=rng,
-        )
-
-        canvas.paste(glyph_image.convert("RGB"), (paste_x, paste_y))
-
-        cursor_x += _glyph_advance(
-            glyph_image.width,
-            active_settings,
-            active_variation,
-            rng,
-        )
+        else:
+            canvas.paste(glyph.image.convert("RGB"), (glyph.x, glyph.y))
 
     return safe_save_image(canvas, output_path)
+
+
+def plan_text_layout(
+    text: str,
+    library: GlyphLibrary,
+    settings: RenderSettings | None = None,
+    variation: RendererVariationConfig | None = None,
+) -> RenderLayout:
+    """Plan seeded word wrapping and calculate the required canvas height."""
+    active_settings = settings or RenderSettings()
+    active_variation = variation or RendererVariationConfig()
+    rng = random.Random(active_variation.seed)
+
+    page_width = active_settings.canvas_width
+    available_width = page_width - (2 * active_settings.margin_left)
+    if page_width <= 0 or available_width <= 0:
+        raise ValueError("Page width must be larger than twice the horizontal margin.")
+
+    max_line_width = active_settings.max_line_width or available_width
+    max_line_width = min(max_line_width, available_width)
+    if max_line_width <= 0:
+        raise ValueError("Maximum line width must be greater than zero.")
+
+    left = active_settings.margin_left
+    right = left + max_line_width
+    cursor_x = left
+    cursor_y = active_settings.margin_top
+    line_index = 0
+    placed: list[PlacedGlyph] = []
+
+    paragraphs = text.split("\n")
+    for paragraph_index, paragraph in enumerate(paragraphs):
+        words = re.findall(r"\S+", paragraph)
+
+        for word in words:
+            plans = [
+                _plan_character(character, library, active_settings, active_variation, rng)
+                for character in word
+            ]
+            word_width = _planned_word_width(plans)
+            line_has_content = cursor_x > left
+
+            if word_width <= max_line_width:
+                required_width = word_width + (
+                    active_settings.word_spacing if line_has_content else 0
+                )
+                if line_has_content and cursor_x + required_width > right:
+                    cursor_x = left
+                    cursor_y += _line_advance(active_settings, active_variation, rng)
+                    line_index += 1
+                    line_has_content = False
+
+                if line_has_content:
+                    cursor_x += active_settings.word_spacing
+
+                cursor_x = _place_plans(
+                    plans,
+                    cursor_x,
+                    cursor_y,
+                    line_index,
+                    placed,
+                )
+                continue
+
+            if line_has_content:
+                cursor_x = left
+                cursor_y += _line_advance(active_settings, active_variation, rng)
+                line_index += 1
+
+            for plan in plans:
+                glyph_width = max(plan.advance, plan.width + max(0, plan.x_jitter))
+                if cursor_x > left and cursor_x + glyph_width > right:
+                    cursor_x = left
+                    cursor_y += _line_advance(active_settings, active_variation, rng)
+                    line_index += 1
+                cursor_x = _place_plans(
+                    [plan],
+                    cursor_x,
+                    cursor_y,
+                    line_index,
+                    placed,
+                )
+
+        if paragraph_index < len(paragraphs) - 1:
+            cursor_x = left
+            cursor_y += _line_advance(active_settings, active_variation, rng)
+            line_index += 1
+
+    content_bottom = max(
+        [cursor_y + active_settings.glyph_height]
+        + [glyph.y + glyph.height for glyph in placed]
+    )
+    required_height = (
+        content_bottom + active_settings.margin_bottom + active_settings.footer_spacing
+    )
+
+    return RenderLayout(
+        glyphs=placed,
+        width=page_width,
+        height=max(1, active_settings.canvas_height, required_height),
+        line_count=line_index + 1,
+    )
+
+
+def _plan_character(
+    character: str,
+    library: GlyphLibrary,
+    settings: RenderSettings,
+    variation: RendererVariationConfig,
+    rng: random.Random,
+) -> _GlyphPlan:
+    """Select, size, and jitter one glyph using the local seeded RNG."""
+    if not library.has_character(character):
+        width = settings.placeholder_width
+        image = None
+    else:
+        glyph_record = library.sample_variant(character, rng=rng)
+        with Image.open(glyph_record.image_path) as source_image:
+            image = source_image.convert("L")
+        scale = jitter_scale(variation.scale_jitter, rng)
+        target_height = max(1, round(settings.glyph_height * scale))
+        image.thumbnail((target_height, target_height))
+        width = image.width
+
+    return _GlyphPlan(
+        character=character,
+        width=width,
+        height=image.height if image is not None else settings.glyph_height,
+        advance=_glyph_advance(width, settings, variation, rng),
+        x_jitter=jitter_int(0, variation.x_jitter_px, rng),
+        y_jitter=jitter_int(0, variation.y_jitter_px, rng),
+        image=image,
+    )
+
+
+def _planned_word_width(plans: list[_GlyphPlan]) -> int:
+    """Return the horizontal extent of a completely planned word."""
+    cursor = 0
+    right_edge = 0
+    for plan in plans:
+        right_edge = max(right_edge, cursor + max(0, plan.x_jitter) + plan.width)
+        cursor += plan.advance
+    return max(cursor, right_edge)
+
+
+def _place_plans(
+    plans: list[_GlyphPlan],
+    cursor_x: int,
+    cursor_y: int,
+    line_index: int,
+    placed: list[PlacedGlyph],
+) -> int:
+    """Place planned glyphs at absolute coordinates and return the next cursor x."""
+    for plan in plans:
+        placed.append(
+            PlacedGlyph(
+                character=plan.character,
+                x=max(0, cursor_x + plan.x_jitter),
+                y=max(0, cursor_y + plan.y_jitter),
+                width=plan.width,
+                height=plan.height,
+                line_index=line_index,
+                image=plan.image,
+            )
+        )
+        cursor_x += plan.advance
+    return cursor_x
 
 
 def _glyph_advance(
